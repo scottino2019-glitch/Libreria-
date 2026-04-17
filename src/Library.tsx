@@ -269,13 +269,14 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
                       </div>
                     )}
                     <div className="absolute top-2 right-2 flex gap-2">
-                      <button 
-                        onClick={(e) => handleDeleteBook(e, book.id)}
-                        className="p-2 bg-red-600/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-lg z-10"
-                        title="Elimina Libro"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+                   <button 
+  onClick={(e) => handleDeleteBook(e, book.id)}
+  className="p-2 bg-red-600/90 text-white rounded-full transition-opacity hover:bg-red-700 shadow-lg z-10"
+  title="Elimina Libro"
+>
+  <Trash2 className="w-4 h-4" />
+</button>   
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
