@@ -301,11 +301,11 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
                         pageAnnotations.map((note) => (
                           <div key={note.id} className="bg-paper-dark p-4 border border-ink/5 shadow-sm group relative rounded-md">
                             <button 
-                              onClick={() => deleteAnnotation(note.id)}
-                              className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 shadow-lg"
-                            >
-                              <X size={12} />
-                            </button>
+                       onClick={() => deleteAnnotation(note.id)}
+  className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full transition-opacity hover:scale-110 shadow-lg"
+>
+  <X size={12} />
+</button>
                             <p className="text-base font-sans text-ink leading-relaxed font-medium">
                               {note.content}
                             </p>
