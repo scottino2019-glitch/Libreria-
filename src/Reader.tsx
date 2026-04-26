@@ -10,6 +10,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from './utils';
+import { PDFPage } from './PDFPageView';
 
 // Configure worker again (best way to ensure it's available)
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -33,12 +34,11 @@ const AntiqueButton = ({ className, children, ...props }: React.ButtonHTMLAttrib
 
 export const ReaderView = ({ book, onClose }: ReaderProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderTaskRef = useRef<any>(null);
+  const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scale, setScale] = useState(0.8);
+  const [scale, setScale] = useState(1.0); // Better base scale for vertical scrolling
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024); // Open by default on desktop
@@ -59,8 +59,11 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
     try {
       const page = await loadedPdf.getPage(1);
       const viewport = page.getViewport({ scale: 1 });
-      const containerWidth = containerRef.current.clientWidth - 48;
-      const newScale = Math.min(1.2, containerWidth / viewport.width);
+      const containerWidth = containerRef.current.clientWidth - (window.innerWidth < 1024 ? 48 : 80);
+      
+      // Aim for a comfortable reading width
+      const targetWidth = Math.min(containerWidth, 900);
+      const newScale = targetWidth / viewport.width;
       setScale(Number(newScale.toFixed(2)));
     } catch (e) {
       console.error(e);
@@ -82,68 +85,43 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
       setError(err.message || 'Errore nel caricamento del file');
       setIsLoading(false);
     }
-  }, [book.file]);
+  }, [book.file, autoFitScale]);
 
   useEffect(() => {
     loadPdf();
   }, [loadPdf]);
 
-  const renderPage = useCallback(async (pageNum: number, currentScale: number) => {
-    if (!pdf || !canvasRef.current) return;
-
-    if (renderTaskRef.current) {
-      renderTaskRef.current.cancel();
-    }
-
-    try {
-      const page = await pdf.getPage(pageNum);
-      
-      if (!canvasRef.current) return;
-
-      // Increase internal resolution for sharpness
-      const dpr = Math.max(window.devicePixelRatio || 1, 2); // Force at least 2x for sharp text
-      const viewport = page.getViewport({ scale: currentScale * dpr });
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d', { alpha: false }); // Perf boost
-      
-      if (!context) return;
-
-      // Higher quality rendering
-      context.imageSmoothingEnabled = false;
-
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      
-      canvas.style.height = `${viewport.height / dpr}px`;
-      canvas.style.width = `${viewport.width / dpr}px`;
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-        intent: 'display' as const
-      };
-
-      const renderTask = page.render(renderContext);
-      renderTaskRef.current = renderTask;
-
-      await renderTask.promise;
-      renderTaskRef.current = null;
-    } catch (error: any) {
-      if (error.name === 'RenderingCancelledException') return;
-      console.error('Render error:', error);
-    }
-  }, [pdf]);
-
+  // Track scroll to update current page number
   useEffect(() => {
-    if (pdf) {
-      renderPage(currentPage, scale);
-    }
-    return () => {
-      if (renderTaskRef.current) {
-        renderTaskRef.current.cancel();
+    const container = containerRef.current;
+    if (!container || !pdf) return;
+
+    const handleScroll = () => {
+      const scrollPos = container.scrollTop + (container.clientHeight / 3);
+      let activePage = 1;
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const element = pageRefs.current[i];
+        if (element && element.offsetTop <= scrollPos) {
+          activePage = i;
+        }
+      }
+      
+      if (activePage !== currentPage) {
+        setCurrentPage(activePage);
       }
     };
-  }, [pdf, currentPage, scale, renderPage]);
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [pdf, currentPage]);
+
+  const scrollToPage = (pageNum: number) => {
+    const element = pageRefs.current[pageNum];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   const addAnnotation = async () => {
     if (!newNote.trim()) return;
@@ -201,17 +179,17 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
         <div className="flex items-center gap-1 sm:gap-2 bg-wood-dark/50 p-1 rounded-sm brass-border h-9 sm:h-10 order-3 sm:order-2 w-full sm:w-auto justify-center">
           <button 
             disabled={currentPage <= 1}
-            onClick={() => setCurrentPage(p => p - 1)}
+            onClick={() => scrollToPage(currentPage - 1)}
             className="p-1 text-[#d4c4b5] hover:text-gold disabled:opacity-30"
           >
             <ChevronLeft size={18} className="sm:w-[20px]" />
           </button>
           <span className="px-2 sm:px-3 text-[#d4c4b5] font-serif text-xs sm:text-sm whitespace-nowrap">
-            Pag. {currentPage} / {book.totalPages}
+            Pag. {currentPage} / {pdf?.numPages || book.totalPages}
           </span>
           <button 
-            disabled={currentPage >= book.totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
+            disabled={!pdf || currentPage >= pdf.numPages}
+            onClick={() => scrollToPage(currentPage + 1)}
             className="p-1 text-[#d4c4b5] hover:text-gold disabled:opacity-30"
           >
             <ChevronRight size={18} className="sm:w-[20px]" />
@@ -220,9 +198,9 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
 
         <div className="flex items-center gap-2 sm:gap-4 order-2 sm:order-3">
           <div className="hidden xs:flex items-center gap-1 bg-wood-dark/50 p-1 rounded-sm brass-border h-9 sm:h-10">
-             <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="p-1 text-[#d4c4b5] hover:text-gold" title="Zoom out"><ZoomOut size={16} className="sm:w-[18px]" /></button>
+             <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-1 text-[#d4c4b5] hover:text-gold" title="Zoom out"><ZoomOut size={16} className="sm:w-[18px]" /></button>
              <span className="text-[10px] sm:text-xs text-[#d4c4b5] font-serif px-1 min-w-[3rem] text-center">{Math.round(scale * 100)}%</span>
-             <button onClick={() => setScale(s => Math.min(5, s + 0.25))} className="p-1 text-[#d4c4b5] hover:text-gold" title="Zoom in"><ZoomIn size={16} className="sm:w-[18px]" /></button>
+             <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-1 text-[#d4c4b5] hover:text-gold" title="Zoom in"><ZoomIn size={16} className="sm:w-[18px]" /></button>
           </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -240,7 +218,7 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
         {/* PDF Stage */}
         <div 
           ref={containerRef}
-          className="flex-1 overflow-auto bg-stone-900/40 p-4 sm:p-8 md:p-12 custom-scrollbar"
+          className="flex-1 overflow-auto bg-stone-900/40 p-4 sm:p-8 md:p-12 custom-scrollbar scroll-smooth"
         >
           {error ? (
             <div className="flex flex-col items-center justify-center min-h-full text-center p-8">
@@ -258,13 +236,19 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
             </div>
           ) : (
             <div className="flex flex-col items-center py-4 sm:py-8">
-              <div className="relative bg-white shadow-[0_20px_60px_rgba(0,0,0,0.4)] ring-1 ring-black/10 flex justify-center mb-12">
-                <canvas 
-                  ref={canvasRef} 
-                  className="shadow-2xl max-w-none"
-                  style={{ imageRendering: 'auto', display: 'block' }} 
-                />
-              </div>
+              {pdf && Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((pageNum) => (
+                <div 
+                  key={pageNum} 
+                  ref={el => { pageRefs.current[pageNum] = el; }}
+                  className="w-full flex justify-center"
+                >
+                  <PDFPage 
+                    pdf={pdf} 
+                    pageNumber={pageNum} 
+                    scale={scale} 
+                  />
+                </div>
+              ))}
             </div>
           )}
         </div>
