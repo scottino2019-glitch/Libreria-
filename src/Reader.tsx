@@ -38,7 +38,7 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
   
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scale, setScale] = useState(0.65); // Default to a more overview-friendly scale
+  const [scale, setScale] = useState(1.0); // Increased default scale for better legibility
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024); // Open by default on desktop
@@ -87,12 +87,15 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
       if (!canvasRef.current) return;
 
       // Increase internal resolution for sharpness
-      const dpr = window.devicePixelRatio || 2; // Default to 2 for extra sharpness if DPR is low
+      const dpr = Math.max(window.devicePixelRatio || 1, 2); // Force at least 2x for sharp text
       const viewport = page.getViewport({ scale: currentScale * dpr });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { alpha: false }); // Perf boost
-
+      
       if (!context) return;
+
+      // Higher quality rendering
+      context.imageSmoothingEnabled = false;
 
       canvas.height = viewport.height;
       canvas.width = viewport.width;
@@ -240,8 +243,12 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
               <p className="font-serif italic text-[#d4c4b5] text-sm sm:text-base text-center">Preparazione del manoscritto...</p>
             </div>
           ) : (
-            <div className="relative bg-white p-1 shadow-[0_20px_60px_rgba(0,0,0,0.15)] ring-1 ring-black/5 flex justify-center max-w-full mb-12">
-              <canvas ref={canvasRef} className="max-w-full h-auto" />
+            <div className="relative bg-white shadow-[0_20px_60px_rgba(0,0,0,0.3)] ring-1 ring-black/10 flex justify-center mb-12">
+              <canvas 
+                ref={canvasRef} 
+                className="shadow-2xl"
+                style={{ imageRendering: 'auto' }} 
+              />
             </div>
           )}
         </div>
@@ -301,11 +308,11 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
                         pageAnnotations.map((note) => (
                           <div key={note.id} className="bg-paper-dark p-4 border border-ink/5 shadow-sm group relative rounded-md">
                             <button 
-                       onClick={() => deleteAnnotation(note.id)}
-  className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full transition-opacity hover:scale-110 shadow-lg"
->
-  <X size={12} />
-</button>
+                              onClick={() => deleteAnnotation(note.id)}
+                              className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 shadow-lg"
+                            >
+                              <X size={12} />
+                            </button>
                             <p className="text-base font-sans text-ink leading-relaxed font-medium">
                               {note.content}
                             </p>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Book as BookIcon, X, Upload, Loader2, Library as LibraryIcon, ChevronLeft, Menu, Trash2 } from 'lucide-react';
+import { Search, Plus, Book as BookIcon, X, Upload, Loader2, Library as LibraryIcon, ChevronLeft, Menu, Trash2, Edit3 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Book } from './db';
 import { getPdfMetadata, generateThumbnail } from './pdfUtils';
@@ -53,11 +53,13 @@ const WoodShelf = ({ children, title }: { children: React.ReactNode, title?: str
 
 export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => void }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024); // Responsive initial state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'error'>('idle');
   const [bookCategory, setBookCategory] = useState('Generale');
+  const [editForm, setEditForm] = useState({ title: '', author: '', category: '' });
 
   // Dynamic categories from database
   const allBooks = useLiveQuery(() => db.books.toArray());
@@ -94,6 +96,26 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
       } catch (err) {
         console.error('Errore durante l\'eliminazione del libro:', err);
       }
+    }
+  };
+
+  const handleEditBook = (e: React.MouseEvent, book: Book) => {
+    e.stopPropagation();
+    setEditingBook(book);
+    setEditForm({ title: book.title, author: book.author, category: book.category || 'Generale' });
+  };
+
+  const saveEdit = async () => {
+    if (!editingBook) return;
+    try {
+      await db.books.update(editingBook.id, {
+        title: editForm.title,
+        author: editForm.author,
+        category: editForm.category
+      });
+      setEditingBook(null);
+    } catch (err) {
+      console.error('Errore durante l\'aggiornamento del libro:', err);
     }
   };
 
@@ -268,17 +290,32 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
                          <BookIcon className="w-12 h-12 text-ink/20" />
                       </div>
                     )}
-                    <div className="absolute top-2 right-2 flex gap-2">
-
-                   <button 
-  onClick={(e) => handleDeleteBook(e, book.id)}
-  className="p-2 bg-red-600/90 text-white rounded-full transition-opacity hover:bg-red-700 shadow-lg z-10"
-  title="Elimina Libro"
->
-  <Trash2 className="w-4 h-4" />
-</button>   
+                    
+                    {/* Action Buttons - More visible for accessibility */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
+                      <button 
+                        onClick={(e) => handleDeleteBook(e, book.id)}
+                        className="p-2.5 bg-red-600/90 text-white rounded-full opacity-100 shadow-xl border border-white/20 active:scale-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-700"
+                        title="Elimina Libro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={(e) => handleEditBook(e, book)}
+                        className="p-2.5 bg-gold/90 text-white rounded-full opacity-100 shadow-xl border border-white/20 active:scale-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-gold"
+                        title="Modifica Libro"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    {/* Visual hint for mobile that actions exist */}
+                    <div className="sm:hidden absolute bottom-2 right-2 flex gap-1 scale-75 opacity-50">
+                       <div className="w-2 h-2 rounded-full bg-ink/40" />
+                       <div className="w-2 h-2 rounded-full bg-ink/40" />
+                    </div>
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   
                   <div className="space-y-2">
@@ -320,7 +357,81 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
         )}
       </main>
 
-      {/* Upload Modal (Keep existing functionality, update style) */}
+      {/* Edit Modal */}
+      <AnimatePresence>
+        {editingBook && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[110] backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-md bg-white p-8 rounded-lg shadow-2xl relative border border-gold/20"
+            >
+              <button 
+                onClick={() => setEditingBook(null)}
+                className="absolute top-4 right-4 text-ink/40 hover:text-ink transition-colors"
+                title="Cancel"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h2 className="text-xl font-display font-bold text-ink mb-6 uppercase tracking-wider">Modifica Dettagli</h2>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Titolo</label>
+                  <input 
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm(s => ({ ...s, title: e.target.value }))}
+                    className="w-full bg-ink/5 border-none p-3 font-sans focus:ring-1 focus:ring-gold/30 outline-none rounded-md"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Autore</label>
+                  <input 
+                    type="text"
+                    value={editForm.author}
+                    onChange={(e) => setEditForm(s => ({ ...s, author: e.target.value }))}
+                    className="w-full bg-ink/5 border-none p-3 font-sans focus:ring-1 focus:ring-gold/30 outline-none rounded-md"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Categoria</label>
+                  <input 
+                    type="text"
+                    list="category-suggestions"
+                    value={editForm.category}
+                    onChange={(e) => setEditForm(s => ({ ...s, category: e.target.value }))}
+                    className="w-full bg-ink/5 border-none p-3 font-sans focus:ring-1 focus:ring-gold/30 outline-none rounded-md"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button 
+                  onClick={() => setEditingBook(null)}
+                  className="flex-1 py-3 px-4 border border-ink/10 rounded-md text-sm font-bold text-ink/60 hover:bg-ink/5 transition-colors"
+                >
+                  Annulla
+                </button>
+                <button 
+                  onClick={saveEdit}
+                  className="flex-1 py-3 px-4 bg-ink text-white rounded-md text-sm font-bold hover:bg-gold transition-colors"
+                >
+                  Salva Modifiche
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {isUploading && (
           <motion.div 
