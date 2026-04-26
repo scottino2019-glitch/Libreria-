@@ -38,7 +38,7 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
   
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scale, setScale] = useState(1.0); // Increased default scale for better legibility
+  const [scale, setScale] = useState(0.8);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024); // Open by default on desktop
@@ -54,6 +54,19 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
 
   const pageAnnotations = annotations?.filter(a => a.pageNumber === currentPage) || [];
 
+  const autoFitScale = useCallback(async (loadedPdf: pdfjsLib.PDFDocumentProxy) => {
+    if (!containerRef.current) return;
+    try {
+      const page = await loadedPdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      const containerWidth = containerRef.current.clientWidth - 48;
+      const newScale = Math.min(1.2, containerWidth / viewport.width);
+      setScale(Number(newScale.toFixed(2)));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const loadPdf = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -62,6 +75,7 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
       const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
       const loadedPdf = await loadingTask.promise;
       setPdf(loadedPdf);
+      await autoFitScale(loadedPdf);
       setIsLoading(false);
     } catch (err: any) {
       console.error('Error loading PDF:', err);
@@ -226,10 +240,10 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
         {/* PDF Stage */}
         <div 
           ref={containerRef}
-          className="flex-1 overflow-auto bg-paper-dark/30 p-6 sm:p-12 md:p-16 flex flex-col items-center custom-scrollbar"
+          className="flex-1 overflow-auto bg-stone-900/40 p-4 sm:p-8 md:p-12 custom-scrollbar"
         >
           {error ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <div className="flex flex-col items-center justify-center min-h-full text-center p-8">
               <div className="paper-texture p-8 brass-border max-w-md">
                 <Trash2 className="w-12 h-12 text-red-800/40 mx-auto mb-4" />
                 <h3 className="font-display text-xl text-wood-dark mb-2 italic">Errore di Lettura</h3>
@@ -238,17 +252,19 @@ export const ReaderView = ({ book, onClose }: ReaderProps) => {
               </div>
             </div>
           ) : isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full">
+            <div className="flex flex-col items-center justify-center min-h-full">
               <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-gold animate-spin mb-4" />
               <p className="font-serif italic text-[#d4c4b5] text-sm sm:text-base text-center">Preparazione del manoscritto...</p>
             </div>
           ) : (
-            <div className="relative bg-white shadow-[0_20px_60px_rgba(0,0,0,0.3)] ring-1 ring-black/10 flex justify-center mb-12">
-              <canvas 
-                ref={canvasRef} 
-                className="shadow-2xl"
-                style={{ imageRendering: 'auto' }} 
-              />
+            <div className="flex flex-col items-center py-4 sm:py-8">
+              <div className="relative bg-white shadow-[0_20px_60px_rgba(0,0,0,0.4)] ring-1 ring-black/10 flex justify-center mb-12">
+                <canvas 
+                  ref={canvasRef} 
+                  className="shadow-2xl max-w-none"
+                  style={{ imageRendering: 'auto', display: 'block' }} 
+                />
+              </div>
             </div>
           )}
         </div>

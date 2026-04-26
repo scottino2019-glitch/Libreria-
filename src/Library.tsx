@@ -291,21 +291,21 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
                       </div>
                     )}
                     
-                    {/* Action Buttons - More visible for accessibility */}
-                    <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
+                    {/* Action Buttons - Always visible and larger for better accessibility */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-2 z-30">
                       <button 
                         onClick={(e) => handleDeleteBook(e, book.id)}
-                        className="p-2.5 bg-red-600/90 text-white rounded-full opacity-100 shadow-xl border border-white/20 active:scale-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-700"
+                        className="p-3 bg-red-600 shadow-2xl text-white rounded-full transition-all hover:bg-red-700 active:scale-95 border-2 border-white/40"
                         title="Elimina Libro"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5 pointer-events-none" />
                       </button>
                       <button 
                         onClick={(e) => handleEditBook(e, book)}
-                        className="p-2.5 bg-gold/90 text-white rounded-full opacity-100 shadow-xl border border-white/20 active:scale-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-gold"
+                        className="p-3 bg-gold shadow-2xl text-white rounded-full transition-all hover:bg-gold/80 active:scale-95 border-2 border-white/40"
                         title="Modifica Libro"
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Edit3 className="w-5 h-5 pointer-events-none" />
                       </button>
                     </div>
                     
