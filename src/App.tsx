@@ -7,57 +7,15 @@ import { AnimatePresence } from 'motion/react';
 export default function App() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
-  // Sync with physical folder static catalog dynamically using Vite's glob import
+  // Sync with physical folder static catalog dynamically
   useEffect(() => {
     async function syncCatalog() {
       try {
-        const globPattern = (import.meta as any).glob('/public/books/*.pdf');
-        const filePaths = Object.keys(globPattern);
-
-        const knownDefaults: Record<string, { id?: string; title: string; author: string; category: string; totalPages?: number }> = {
-          'favole_da_vinci.pdf': { id: 'public-le-favole-da-vinci', title: 'Favole Scelte', author: 'Leonardo da Vinci', category: 'Classici', totalPages: 4 },
-          'inferno_canto1.pdf': { id: 'public-inferno-canto1', title: 'Inferno - Canto I', author: 'Dante Alighieri', category: 'Poesia', totalPages: 4 },
-          'pinocchio_cap1.pdf': { id: 'public-pinocchio-cap1', title: 'Pinocchio - Cap I', author: 'Carlo Collodi', category: 'Fiabe', totalPages: 3 },
-          'canti_leopardi.pdf': { id: 'public-canti-leopardi', title: 'Canti', author: 'Giacomo Leopardi', category: 'Poesia', totalPages: 20 },
-        };
-
-        const list: Book[] = filePaths.map((filePath, index) => {
-          const fileName = filePath.split('/').pop() || '';
-          const baseName = fileName.replace(/\.[^/.]+$/, ""); // strip extension
-          const url = `/books/${fileName}`;
-
-          const known = knownDefaults[fileName] || knownDefaults[fileName.toLowerCase()];
-
-          if (known) {
-            return {
-              id: known.id || `public-${baseName}`,
-              title: known.title,
-              author: known.author,
-              category: known.category,
-              url,
-              addedAt: index + 1,
-              totalPages: known.totalPages || 4,
-              fileSize: 10 * 1024
-            };
-          } else {
-            // Dynamic title/author formatting from filename
-            const nameWithoutExt = baseName.replace(/[-_]/g, ' ');
-            const prettyTitle = nameWithoutExt.split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
-
-            return {
-              id: `public-${baseName}`,
-              title: prettyTitle,
-              author: 'Autore Sconosciuto',
-              category: 'Generale',
-              url,
-              addedAt: Date.now() + index,
-              totalPages: 10,
-              fileSize: 10 * 1024
-            };
-          }
-        });
+        const response = await fetch(`/books/catalog.json?t=${Date.now()}`);
+        if (!response.ok) {
+          throw new Error(`File catalog.json non trovato: ${response.status}`);
+        }
+        const list: Book[] = await response.json();
         
         // Filter out user-deleted books (stored locally in localStorage)
         const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_book_ids') || '[]');
