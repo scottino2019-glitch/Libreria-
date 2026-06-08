@@ -114,10 +114,9 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [isDragging, setIsDragging] = useState(false);
 
+  const processAndSaveFile = async (file: File) => {
     try {
       setUploadStatus('processing');
       
@@ -164,6 +163,43 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
       console.error('Database save failed:', error);
       alert('Impossibile salvare il volume sulla memoria locale dell\'app: ' + (error.message || error));
       setUploadStatus('error');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processAndSaveFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (uploadStatus !== 'processing') {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (uploadStatus === 'processing') return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        await processAndSaveFile(file);
+      } else {
+        alert('Per favore carichi esclusivamente pergamene o libri in formato PDF.');
+      }
     }
   };
 
@@ -507,7 +543,17 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
                   <p className="text-[10px] text-ink/40 font-sans">Digita un nuovo genere o scegline uno esistente</p>
                 </div>
 
-                <label className="block w-full border-2 border-dashed border-gold/40 h-48 rounded-sm cursor-pointer hover:border-gold transition-all hover:bg-gold/5 group relative overflow-hidden">
+                <label 
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={cn(
+                    "block w-full border-2 border-dashed h-48 rounded-sm cursor-pointer transition-all group relative overflow-hidden",
+                    isDragging 
+                      ? "border-gold bg-gold/10 scale-[1.02]" 
+                      : "border-gold/40 hover:border-gold hover:bg-gold/5"
+                  )}
+                >
                   <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} disabled={uploadStatus === 'processing'} />
                   
                   <div className="h-full flex flex-col items-center justify-center gap-3 text-wood-dark/60 group-hover:text-wood-dark">
@@ -518,10 +564,10 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
                       </>
                     ) : (
                       <>
-                        <Upload className="w-10 h-10 group-hover:scale-110 transition-transform" />
+                        <Upload className={cn("w-10 h-10 group-hover:scale-110 transition-transform", isDragging && "scale-110 text-gold animate-pulse")} />
                         <div className="text-center">
                           <p className="font-serif italic text-lg">Pergamena PDF</p>
-                          <p className="text-xs font-serif opacity-60">Clicca o trascina</p>
+                           <p className="text-xs font-serif opacity-60">Clicca o trascina</p>
                         </div>
                       </>
                     )}
@@ -594,3 +640,4 @@ export const LibraryView = ({ onSelectBook }: { onSelectBook: (book: Book) => vo
     </div>
   );
 };
+
