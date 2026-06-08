@@ -35,10 +35,18 @@ export default function App() {
           };
         });
 
-        // Delete local books that are static (no local .file Blob) but are no longer in the static catalog or were deleted by user
+        // Delete local books that are static (served from server) but are no longer in the static catalog or were deleted by user
         const serverIds = new Set(filteredList.map(b => b.id));
         const idsToDelete = localBooks
-          .filter(b => !b.file && (!serverIds.has(b.id) || deletedSet.has(b.id)))
+          .filter(b => {
+            // A book is static/server-side if its ID starts with 'public-' or if it has a server url
+            const isStaticBook = b.id.startsWith('public-') || (b.url && b.url.startsWith('/books/'));
+            if (isStaticBook) {
+              return !serverIds.has(b.id) || deletedSet.has(b.id);
+            }
+            // User-uploaded books (which aren't static server books) are preserved safely
+            return false;
+          })
           .map(b => b.id);
 
         if (idsToDelete.length > 0) {
@@ -102,3 +110,4 @@ export default function App() {
     </div>
   );
 }
+
